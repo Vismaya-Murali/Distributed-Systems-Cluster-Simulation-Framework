@@ -13,7 +13,7 @@ def add_node():
     cpu_cores = data.get("cpu_cores", 2)    #default to 2 if no value
 
     #new container
-    container = client.containers.run("CONT_NAME", "sh -c 'while true; do sleep 5; done'", detach=True)
+    container = client.containers.run("alpine", "sh -c 'while true; do sleep 5; done'", detach=True)
 
     node_id = str(uuid.uuid4())
     nodes[node_id] = {
