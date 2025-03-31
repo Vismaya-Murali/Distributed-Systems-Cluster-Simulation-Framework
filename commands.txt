@@ -1,0 +1,5 @@
+python3 api_server.py
+
+create node: curl -X POST http://127.0.0.1:5000/add_node -H "Content-Type: application/json" -d '{"cpu_cores": 4}'
+
+list nodes: curl -X GET http://127.0.0.1:5000/list_nodes
