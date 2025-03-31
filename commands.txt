@@ -1,5 +1,17 @@
+pip install -r requirements.txt
+
 python3 api_server.py
 
-create node: curl -X POST http://127.0.0.1:5000/add_node -H "Content-Type: application/json" -d '{"cpu_cores": 4}'
+create node: 
+FOR UBUNTU:
+    curl -X POST http://127.0.0.1:5000/add_node -H "Content-Type: application/json" -d {"cpu_cores": 4}'
+FOR WINDOWS:
+    curl -X POST http://127.0.0.1:5000/add_node -H "Content-Type: application/json" -d "{\"cpu_cores\": 4}"
+
+launch pod:
+FOR WINDOWS:
+    curl -X POST http://127.0.0.1:5000/launch_pod -H "Content-Type: application/json" -d "{\"cpu_request\": 2, \"algorithm\": \"first_fit\"}"
 
 list nodes: curl -X GET http://127.0.0.1:5000/list_nodes
+
+list pods: curl -X GET http://127.0.0.1:5000/list_pods

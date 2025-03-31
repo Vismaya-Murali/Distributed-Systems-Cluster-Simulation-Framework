@@ -1,45 +1,36 @@
 from flask import Flask, jsonify, request
-import docker
 import uuid
+from nodes import nodes, add_node, list_nodes
+from pods import launch_pod, list_pods
 
 app = Flask(__name__)
-client = docker.from_env()
 
-nodes = {}  # Stores node details
-
+# API: Add Node
 @app.route('/add_node', methods=['POST'])
-def add_node():
+def api_add_node():
+    return add_node(request.json)
+
+# API: Launch Pod (Select algorithm dynamically)
+@app.route('/launch_pod', methods=['POST'])
+def api_launch_pod():
     data = request.json
-    cpu_cores = data.get("cpu_cores", 2)    #default to 2 if no value
+    algo = data.get("algorithm", "first_fit")  # Default is First Fit
+    return launch_pod(data, algo)
 
-    #new container
-    container = client.containers.run("CONT_NAME", "sh -c 'while true; do sleep 5; done'", detach=True)
-
-    node_id = str(uuid.uuid4())
-    nodes[node_id] = {
-        "id": node_id,
-        "cpu_cores": cpu_cores,
-        "container_id": container.id,
-        "status": "running"
-    }
-
-    return jsonify({"message": "Node added successfully", "node_id": node_id}), 201
-
+# API: List Nodes
 @app.route('/list_nodes', methods=['GET'])
 def list_nodes():
-    # Filter out stopped nodes
-    running_nodes = {}
-    for node_id, node in list(nodes.items()):
-        try:
-            container = client.containers.get(node["container_id"])
-            if container.status == "running":
-                running_nodes[node_id] = node
-            else:
-                del nodes[node_id]  # Remove stopped node
-        except docker.errors.NotFound:
-            del nodes[node_id]  # Remove node if container is not found
+    return nodes
 
-    return jsonify(running_nodes)
+# API: List Pods
+@app.route('/list_pods', methods=['GET'])
+def api_list_pods():
+    return list_pods()
+
+# # API: Recover Pods
+# @app.route('/recover_pods', methods=['POST'])
+# def api_recover_pods():
+#     return recover_pods(request.json)
 
 if __name__ == '__main__':
-    app.run(debug=True) #running on port 5000
+    app.run(debug=True)
