@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 import uuid
 from nodes import nodes, add_node, list_nodes
 from pods import launch_pod, list_pods
+from health_monitor import receive_heartbeat, get_status
 
 app = Flask(__name__)
 
@@ -17,6 +18,7 @@ def api_launch_pod():
     algo = data.get("algorithm", "first_fit")  # Default is First Fit
     return launch_pod(data, algo)
 
+
 # API: List Nodes
 @app.route('/list_nodes', methods=['GET'])
 def list_nodes():
@@ -26,6 +28,16 @@ def list_nodes():
 @app.route('/list_pods', methods=['GET'])
 def api_list_pods():
     return list_pods()
+
+# API: Receive Heartbeat
+@app.route('/heartbeat', methods=['POST'])
+def api_receive_heartbeat():
+    return receive_heartbeat()
+
+# API: System Status
+@app.route('/status', methods=['GET'])
+def api_get_status():
+    return get_status()
 
 # # API: Recover Pods
 # @app.route('/recover_pods', methods=['POST'])
