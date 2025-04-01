@@ -12,6 +12,10 @@ launch pod:
 FOR WINDOWS:
     curl -X POST http://127.0.0.1:5000/launch_pod -H "Content-Type: application/json" -d "{\"cpu_request\": 2, \"algorithm\": \"first_fit\"}"
 
+FOR UBUNTU:
+    curl -X POST http://127.0.0.1:5000/launch_pod -H "Content-Type: application/json" -d '{"cpu_request": 2, "algorithm": "best_fit"}'
+
+    
 list nodes: curl -X GET http://127.0.0.1:5000/list_nodes
 
 list pods: curl -X GET http://127.0.0.1:5000/list_pods
