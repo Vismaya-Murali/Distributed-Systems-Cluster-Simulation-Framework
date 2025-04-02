@@ -23,6 +23,8 @@ list pods: curl -X GET http://127.0.0.1:5000/list_pods
 
 POST http://10.0.2.15:5000/heartbeat
 
+
+run below commands in powershell
 stop all nodes:
 docker stop $(docker ps -q)
 
