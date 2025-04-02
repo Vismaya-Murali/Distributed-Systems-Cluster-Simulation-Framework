@@ -19,3 +19,6 @@ FOR UBUNTU:
 list nodes: curl -X GET http://127.0.0.1:5000/list_nodes
 
 list pods: curl -X GET http://127.0.0.1:5000/list_pods
+
+
+testing
