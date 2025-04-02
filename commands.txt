@@ -21,4 +21,15 @@ list nodes: curl -X GET http://127.0.0.1:5000/list_nodes
 list pods: curl -X GET http://127.0.0.1:5000/list_pods
 
 
-testing
+POST http://10.0.2.15:5000/heartbeat
+
+stop all nodes:
+docker stop $(docker ps -q)
+
+stop indivisual
+docker stop <cont_id>
+
+
+remove container:
+docker rm -f $(docker ps -aq)
+
