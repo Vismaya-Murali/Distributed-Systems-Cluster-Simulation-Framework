@@ -29,7 +29,7 @@ def add_node():
     # Start a container that continuously sends heartbeats
     container = client.containers.run(
     "alpine",
-    'sh -c "apk add --no-cache curl && while true; do curl -X POST http://10.0.2.15:5000/heartbeat -H \\"Content-Type: application/json\\" -d \\"{\\\\\\"node_id\\\\\\": \\\\\\"%s\\\\\\"}\\\"; sleep 5; done"' % node_id,
+    'sh -c "apk add --no-cache curl && while true; do curl -X POST  http://10.0.2.15:5000/heartbeat -H \\"Content-Type: application/json\\" -d \\"{\\\\\\"node_id\\\\\\": \\\\\\"%s\\\\\\"}\\\"; sleep 5; done"' % node_id,
     detach=True
 )
 
@@ -130,21 +130,33 @@ def monitor_heartbeats():
 
 
 def recover_pods(failed_node_id):
-    """Handles pod recovery when a node fails."""
     if failed_node_id not in nodes:
         return
-
+    
     print(f"Recovering pods from failed node {failed_node_id}...")
-
-    # Release CPU resources & reschedule pods
-    for pod_id in nodes[failed_node_id]["pods"]:
-        pods.pop(pod_id, None)
-
+    failed_pods = nodes[failed_node_id]["pods"]
     del nodes[failed_node_id]
-
-
-# Start the heartbeat monitoring thread
+    
+    rescheduled_pods = []
+    unscheduled_pods = []
+    for pod_id in failed_pods:
+        pod_data = pods.pop(pod_id, None)
+        if pod_data:
+            cpu_request = pod_data["cpu_request"]
+            new_node_id = first_fit(nodes, cpu_request)  # Attempt rescheduling
+            if new_node_id:
+                nodes[new_node_id]["available_cpu"] -= cpu_request
+                nodes[new_node_id]["pods"].append(pod_id)
+                pods[pod_id] = {"node_id": new_node_id, "cpu_request": cpu_request}
+                rescheduled_pods.append(pod_id)
+            else:
+                unscheduled_pods.append(pod_id)
+    
+    print(f"Successfully rescheduled pods: {rescheduled_pods}")
+    if unscheduled_pods:
+        print(f"Failed to reschedule pods due to insufficient resources: {unscheduled_pods}")
 threading.Thread(target=monitor_heartbeats, daemon=True).start()
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)  # Bind to all interfaces
