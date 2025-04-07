@@ -12,9 +12,9 @@ app = Flask(__name__)
 client = docker.from_env()
 
 nodes = {}  # Stores node details { node_id: { details } }
-pods = {}  # Stores pod details { pod_id: { node_id, cpu_request } }
+pods = {}   # Stores pod details { pod_id: { node_id, cpu_request, algorithm } }
 
-HEARTBEAT_TIMEOUT = 15 # Timeout in seconds before marking a node as failed
+HEARTBEAT_TIMEOUT = 15  # Timeout in seconds before marking a node as failed
 
 
 # --- NODE MANAGEMENT ---
@@ -28,13 +28,10 @@ def add_node():
 
     # Start a container that continuously sends heartbeats
     container = client.containers.run(
-    "alpine",
-    'sh -c "apk add --no-cache curl && while true; do curl -X POST http://10.0.2.15:5000/heartbeat -H \\"Content-Type: application/json\\" -d \\"{\\\\\\"node_id\\\\\\": \\\\\\"%s\\\\\\"}\\\"; sleep 5; done"' % node_id,
-    detach=True
-)
-
-
-
+        "alpine",
+        'sh -c "apk add --no-cache curl && while true; do curl -X POST http:///192.168.0.104:5000/heartbeat -H \\"Content-Type: application/json\\" -d \\"{\\\\\\"node_id\\\\\\": \\\\\\"%s\\\\\\"}\\\"; sleep 5; done"' % node_id,
+        detach=True
+    )
 
     nodes[node_id] = {
         "id": node_id,
@@ -43,7 +40,7 @@ def add_node():
         "pods": [],
         "container_id": container.id,
         "status": "running",
-        "last_heartbeat": time.time() + HEARTBEAT_TIMEOUT 
+        "last_heartbeat": time.time() + HEARTBEAT_TIMEOUT
     }
 
     return jsonify({"message": "Node added successfully", "node_id": node_id}), 201
@@ -63,7 +60,7 @@ def heartbeat():
         if not node_id or node_id not in nodes:
             return jsonify({"error": "Invalid node_id"}), 400
 
-        # *Update last_heartbeat to prevent node removal*
+        # Update last_heartbeat to prevent node removal
         nodes[node_id]["last_heartbeat"] = time.time()
 
         return jsonify({"message": f"Heartbeat received for node {node_id}"}), 200
@@ -77,7 +74,6 @@ def heartbeat():
 def launch_pod(data, algo):
     cpu_request = data.get("cpu_request", 1)
 
-    # Select algorithm based on the provided one
     if algo == "first_fit":
         node_id = first_fit(nodes, cpu_request)
     elif algo == "best_fit":
@@ -90,11 +86,14 @@ def launch_pod(data, algo):
     if not node_id:
         return jsonify({"error": "No suitable node available"}), 400
 
-    # Reserve resources
     nodes[node_id]["available_cpu"] -= cpu_request
     pod_id = str(uuid.uuid4())
     nodes[node_id]["pods"].append(pod_id)
-    pods[pod_id] = {"node_id": node_id, "cpu_request": cpu_request}
+    pods[pod_id] = {
+        "node_id": node_id,
+        "cpu_request": cpu_request,
+        "algorithm": algo
+    }
 
     return jsonify({"message": "Pod launched", "pod_id": pod_id, "node_id": node_id}), 201
 
@@ -102,7 +101,7 @@ def launch_pod(data, algo):
 @app.route('/launch_pod', methods=['POST'])
 def api_launch_pod():
     data = request.json
-    algo = data.get("algorithm", "first_fit")  # Default to first_fit if no algorithm is provided
+    algo = data.get("algorithm", "first_fit")  # Default to first_fit if not specified
     return launch_pod(data, algo)
 
 
@@ -120,7 +119,7 @@ def monitor_heartbeats():
         now = time.time()
         to_remove = []
 
-        for node_id, node in nodes.items():
+        for node_id, node in list(nodes.items()):
             if now - node["last_heartbeat"] > HEARTBEAT_TIMEOUT:
                 print(f"Node {node_id} failed (no heartbeat)")
                 to_remove.append(node_id)
@@ -136,15 +135,38 @@ def recover_pods(failed_node_id):
 
     print(f"Recovering pods from failed node {failed_node_id}...")
 
-    # Release CPU resources & reschedule pods
-    for pod_id in nodes[failed_node_id]["pods"]:
-        pods.pop(pod_id, None)
+    failed_pods = nodes[failed_node_id]["pods"]
+    del nodes[failed_node_id]  # Remove the failed node
 
-    del nodes[failed_node_id]
+    for pod_id in failed_pods:
+        pod = pods.get(pod_id)
+        if not pod:
+            continue
+
+        cpu_request = pod["cpu_request"]
+        algorithm = pod.get("algorithm", "first_fit")
+
+        if algorithm == "first_fit":
+            new_node_id = first_fit(nodes, cpu_request)
+        elif algorithm == "best_fit":
+            new_node_id = best_fit(nodes, cpu_request)
+        elif algorithm == "worst_fit":
+            new_node_id = worst_fit(nodes, cpu_request)
+        else:
+            new_node_id = None
+
+        if new_node_id:
+            nodes[new_node_id]["available_cpu"] -= cpu_request
+            nodes[new_node_id]["pods"].append(pod_id)
+            pod["node_id"] = new_node_id
+            print(f"Rescheduled pod {pod_id} to node {new_node_id}")
+        else:
+            print(f"Failed to reschedule pod {pod_id}, no suitable node")
+            pods.pop(pod_id, None)
 
 
-# Start the heartbeat monitoring thread
+# Start heartbeat monitoring
 threading.Thread(target=monitor_heartbeats, daemon=True).start()
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)  # Bind to all interfaces
+    app.run(host="0.0.0.0", port=5000, debug=True)
