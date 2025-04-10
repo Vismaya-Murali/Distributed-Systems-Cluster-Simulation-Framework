@@ -20,6 +20,7 @@ list nodes: curl -X GET http://127.0.0.1:5000/list_nodes
 
 list pods: curl -X GET http://127.0.0.1:5000/list_pods
 
+mark pod as unhealthy: curl -X POST http://localhost:5000/heartbeat -H "Content-Type: application/json" -d "{\"node_id\": \"node id\", \"unhealthy_pods\": [\"pod id \"]}"
 
 POST http://10.0.2.15:5000/heartbeat
 
