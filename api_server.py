@@ -14,7 +14,7 @@ client = docker.from_env()
 nodes = {}  # Stores node details { node_id: { details } }
 pods = {}   # Stores pod details { pod_id: { node_id, cpu_request, algorithm } }
 
-HEARTBEAT_TIMEOUT = 10  # Timeout in seconds before marking a node as failed
+HEARTBEAT_TIMEOUT = 20  # Timeout in seconds before marking a node as failed
 
 # --- NODE MANAGEMENT ---
 
@@ -54,19 +54,22 @@ def heartbeat():
     try:
         data = request.get_json()
         node_id = data.get('node_id')
-        unhealthy_pods = data.get('unhealthy_pods', [])
+        current_unhealthy_pods = data.get('unhealthy_pods', [])
 
         if not node_id or node_id not in nodes:
             return jsonify({"error": "Invalid node_id"}), 400
 
         print(f"[Heartbeat] Received from node: {node_id} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        nodes[node_id]["last_heartbeat"] = time.time()
+        node = nodes[node_id]
+        node["last_heartbeat"] = time.time()
 
         removed_pods = []
 
-        for pod_id in unhealthy_pods:
-            print(f"Pod {pod_id} reported as unhealthy by node {node_id}")
+        # Remove pods that were marked as unhealthy in the previous heartbeat
+        previous_unhealthy_pods = node.get("unhealthy_pods", [])
+        for pod_id in previous_unhealthy_pods:
+            print(f"Removing previously reported unhealthy pod {pod_id} from node {node_id}")
 
             if pod_id not in pods:
                 print(f"Pod {pod_id} not found")
@@ -80,14 +83,17 @@ def heartbeat():
             cpu_request = pod["cpu_request"]
 
             # Free up resources and remove pod
-            nodes[node_id]["available_cpu"] += cpu_request
-            if pod_id in nodes[node_id]["pods"]:
-                nodes[node_id]["pods"].remove(pod_id)
+            node["available_cpu"] += cpu_request
+            if pod_id in node["pods"]:
+                node["pods"].remove(pod_id)
 
             pods.pop(pod_id, None)
             removed_pods.append(pod_id)
 
-            print(f"Unhealthy pod {pod_id} has been removed.")
+            print(f"Pod {pod_id} removed.")
+
+        # Store current unhealthy pods for removal on next heartbeat
+        node["unhealthy_pods"] = current_unhealthy_pods
 
         return jsonify({
             "message": f"Heartbeat received for node {node_id}",
