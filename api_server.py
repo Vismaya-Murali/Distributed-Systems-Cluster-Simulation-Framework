@@ -14,7 +14,7 @@ client = docker.from_env()
 nodes = {}  # Stores node details { node_id: { details } }
 pods = {}   # Stores pod details { pod_id: { node_id, cpu_request, algorithm } }
 
-HEARTBEAT_TIMEOUT = 15  # Timeout in seconds before marking a node as failed
+HEARTBEAT_TIMEOUT = 10  # Timeout in seconds before marking a node as failed
 
 # --- NODE MANAGEMENT ---
 
@@ -27,7 +27,7 @@ def add_node():
 
     container = client.containers.run(
         "alpine",
-        'sh -c "apk add --no-cache curl && while true; do curl -X POST http://10.20.204.165:5000/heartbeat -H \\"Content-Type: application/json\\" -d \\"{\\\\\\"node_id\\\\\\": \\\\\\"%s\\\\\\"}\\\"; sleep 5; done"' % node_id,
+        'sh -c "apk add --no-cache curl && while true; do curl -X POST http:///192.168.0.108:5000/heartbeat -H \\"Content-Type: application/json\\" -d \\"{\\\\\\"node_id\\\\\\": \\\\\\"%s\\\\\\"}\\\"; sleep 10; done"' % node_id,
         detach=True
     )
 
@@ -58,6 +58,8 @@ def heartbeat():
 
         if not node_id or node_id not in nodes:
             return jsonify({"error": "Invalid node_id"}), 400
+
+        print(f"[Heartbeat] Received from node: {node_id} at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         nodes[node_id]["last_heartbeat"] = time.time()
 
